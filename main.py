@@ -9,7 +9,6 @@ import imageio
 import numpy as np
 from pyzbar.pyzbar import decode
 from datetime import date
-
 # Function to mark attendance
 def mark_attendance(qr_code):
     conn = sqlite3.connect('students.db')

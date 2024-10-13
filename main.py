@@ -7,6 +7,18 @@ import cv2
 import numpy as np
 from datetime import date
 
+# Function to get student name by QR code
+def get_student_name(qr_code):
+    conn = sqlite3.connect('students.db')
+    c = conn.cursor()
+
+    # Get student name using the qr_code
+    c.execute("SELECT name FROM students WHERE qr_code = ?", (qr_code,))
+    result = c.fetchone()
+
+    conn.close()
+    return result[0] if result else None
+
 # Function to mark attendance
 def mark_attendance(qr_code):
     conn = sqlite3.connect('students.db')
@@ -34,10 +46,10 @@ def mark_attendance(qr_code):
                   (student_id, today, 1))
         conn.commit()
         conn.close()
-        return True
+        return student_id  # Return student ID for name lookup
     else:
         conn.close()
-        return False
+        return None
 
 
 # Streamlit app interface
@@ -56,15 +68,21 @@ if uploaded_file is not None:
 
     # Convert the image to an array and detect QR code
     img_array = np.array(image)
-    qr_detector = cv2.QRCodeDetector()
-    qr_code_data, _, _ = qr_detector(img_array)
+    qcd = cv2.QRCodeDetector()
+    retval, decoded_info, points, straight_qrcode = qcd.detectAndDecodeMulti(img_array)
 
-    if qr_code_data:
-        st.write(f"QR Code detected: {qr_code_data}")
+    if retval:
+        st.write(f"QR Code detected: {decoded_info}")
 
-        if mark_attendance(qr_code_data):
-            st.success(f"Attendance marked for QR code: {qr_code_data}")
+        student_id = mark_attendance(decoded_info[0])
+        if student_id:
+            # Get the student's name
+            student_name = get_student_name(decoded_info[0])
+            if student_name:
+                st.success(f"Attendance marked for {student_name}!")
+            else:
+                st.error("Student name not found.")
         else:
-            st.error("QR Code not recognized")
+            st.error("QR Code not recognized.")
     else:
         st.error("No QR Code found in the image.")

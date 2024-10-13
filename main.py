@@ -5,15 +5,16 @@ import io
 import random
 import string
 from PIL import Image
-import imageio
+import cv2
 import numpy as np
-import cv2  # For QR code decoding and video capture
+from pyzbar.pyzbar import decode
 from datetime import date
 
 # Function to mark attendance
 def mark_attendance(qr_code):
     conn = sqlite3.connect('students.db')
     c = conn.cursor()
+
     # Check if the student exists
     c.execute("SELECT id FROM students WHERE qr_code = ?", (qr_code,))
     result = c.fetchone()
@@ -41,8 +42,13 @@ def mark_attendance(qr_code):
         conn.close()
         return False
 
+
+
+
+
 # Streamlit app interface
 st.title("Student Attendance QR Code Generator and Scanner")
+
 
 # QR Code scanning page
 st.write("Scan a QR Code to mark attendance")
@@ -53,45 +59,39 @@ run = st.checkbox("Start Camera")
 FRAME_WINDOW = st.image([])
 
 cap = None
-qr_decoder = cv2.QRCodeDetector()  # Initialize QRCodeDetector
-
-# Initialize session state to track processed QR codes
-if "processed_qr_codes" not in st.session_state:
-    st.session_state.processed_qr_codes = set()
-
 if run:
-    # Start the webcam capture using OpenCV
-    cap = cv2.VideoCapture(0)  # 0 is the default camera
+    cap = cv2.VideoCapture(0)
 
 while run:
-    if cap.isOpened():
-        ret, frame = cap.read()  # Capture frame-by-frame
-        if not ret:
-            st.error("Failed to capture video frame")
-            break
+    ret, frame = cap.read()
 
-        # Convert the frame to RGB for display in Streamlit
-        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        FRAME_WINDOW.image(frame_rgb)
+    if not ret:
+        st.error("Failed to grab frame")
+        break
 
-        # Decode the QR code in the frame using OpenCV
-        qr_code_data, points, _ = qr_decoder.detectAndDecode(frame)
+    # Convert the frame to RGB for display in Streamlit
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    FRAME_WINDOW.image(frame)
 
-        if qr_code_data:
-            # Check if the QR code has already been processed
-            if qr_code_data not in st.session_state.processed_qr_codes:
-                if mark_attendance(qr_code_data):
-                    st.success(f"Attendance marked for QR code: {qr_code_data}")
-                    st.session_state.processed_qr_codes.add(qr_code_data)
-                else:
-                    st.warning(f"QR code not recognized: {qr_code_data}")
-            else:
-                st.info(f"QR code {qr_code_data} has already been processed")
+    st.session_state[qr_code_data]=False
+    # Decode the QR code in the frame
+    decoded_objects = decode(frame)
+    if decoded_objects:
+        for obj in decoded_objects:
+            qr_code_data = obj.data.decode('utf-8')
+            st.write(f"QR Code detected: {qr_code_data}")
 
-    else:
-        st.error("Webcam not found or cannot be opened")
+            if mark_attendance(qr_code_data) and st.session_state[qr_code_data]==False:
+                st.success(f"Attendance marked for QR code: {qr_code_data}")
+                st.session_state[qr_code_data]=True
+            elif st.session_state[qr_code_data]==True:
+                st.error(f"QR Code not recognized")
+                st.session_state[qr_code_data]=False
 
     # Stop when the checkbox is unchecked
     if not run:
-        cap.release()
         break
+
+if cap:
+    cap.release()
+    cv2.destroyAllWindows()

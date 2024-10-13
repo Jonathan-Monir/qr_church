@@ -1,7 +1,5 @@
+imageio
 opencv-python==4.10.0.84
 pyzbar
 Pillow
 qrcode
-imageio
-zbar
-ta-lib

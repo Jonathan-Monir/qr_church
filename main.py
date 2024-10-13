@@ -2,8 +2,6 @@ import streamlit as st
 import qrcode
 import sqlite3
 import io
-import random
-import string
 from PIL import Image
 import cv2
 import numpy as np
@@ -22,13 +20,13 @@ def mark_attendance(qr_code):
         student_id = result[0]
         today = date.today().isoformat()
 
-        # Create the attendance table for storing attendance records if not exists
+        # Create the attendance table if it does not exist
         c.execute(f'''CREATE TABLE IF NOT EXISTS attendance_log (
                         student_id INTEGER,
                         attendance_date DATE,
                         attended INTEGER,
                         PRIMARY KEY (student_id, attendance_date),
-                        FOREIGN KEY(student_id) REFERENCES attendance(id)
+                        FOREIGN KEY(student_id) REFERENCES students(id)
                      )''')
 
         # Mark the student as attended for today
@@ -46,32 +44,20 @@ def mark_attendance(qr_code):
 st.title("Student Attendance QR Code Generator and Scanner")
 
 # QR Code scanning page
-st.write("Scan a QR Code to mark attendance")
+st.write("Upload a QR Code image to mark attendance")
 
-# Open the webcam
-run = st.checkbox("Start Camera")
+# Allow the user to upload an image
+uploaded_file = st.file_uploader("Choose a QR code image...", type=["jpg", "jpeg", "png"])
 
-FRAME_WINDOW = st.image([])
+if uploaded_file is not None:
+    # Load the image
+    image = Image.open(uploaded_file)
+    st.image(image, caption='Uploaded QR Code', use_column_width=True)
 
-cap = None
-qr_detector = cv2.QRCodeDetector()
-
-if run:
-    cap = cv2.VideoCapture(0)
-
-while run:
-    ret, frame = cap.read()
-
-    if not ret:
-        st.error("Failed to grab frame")
-        break
-
-    # Convert the frame to RGB for display in Streamlit
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    FRAME_WINDOW.image(frame)
-
-    # Detect and decode the QR code using cv2's QRCodeDetector
-    qr_code_data, _, _ = qr_detector.detectAndDecode(frame)
+    # Convert the image to an array and detect QR code
+    img_array = np.array(image)
+    qr_detector = cv2.QRCodeDetector()
+    qr_code_data, _, _ = qr_detector(img_array)
 
     if qr_code_data:
         st.write(f"QR Code detected: {qr_code_data}")
@@ -80,11 +66,5 @@ while run:
             st.success(f"Attendance marked for QR code: {qr_code_data}")
         else:
             st.error("QR Code not recognized")
-
-    # Stop when the checkbox is unchecked
-    if not run:
-        break
-
-if cap:
-    cap.release()
-    cv2.destroyAllWindows()
+    else:
+        st.error("No QR Code found in the image.")

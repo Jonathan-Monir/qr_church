@@ -4,3 +4,4 @@ Pillow
 qrcode
 imageio
 zbar
+ta-lib

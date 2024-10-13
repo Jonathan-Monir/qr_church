@@ -7,7 +7,6 @@ import string
 from PIL import Image
 import cv2
 import numpy as np
-from pyzbar.pyzbar import decode
 from datetime import date
 
 # Function to mark attendance
@@ -43,12 +42,8 @@ def mark_attendance(qr_code):
         return False
 
 
-
-
-
 # Streamlit app interface
 st.title("Student Attendance QR Code Generator and Scanner")
-
 
 # QR Code scanning page
 st.write("Scan a QR Code to mark attendance")
@@ -59,6 +54,8 @@ run = st.checkbox("Start Camera")
 FRAME_WINDOW = st.image([])
 
 cap = None
+qr_detector = cv2.QRCodeDetector()
+
 if run:
     cap = cv2.VideoCapture(0)
 
@@ -73,20 +70,16 @@ while run:
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     FRAME_WINDOW.image(frame)
 
-    st.session_state[qr_code_data]=False
-    # Decode the QR code in the frame
-    decoded_objects = decode(frame)
-    if decoded_objects:
-        for obj in decoded_objects:
-            qr_code_data = obj.data.decode('utf-8')
-            st.write(f"QR Code detected: {qr_code_data}")
+    # Detect and decode the QR code using cv2's QRCodeDetector
+    qr_code_data, _, _ = qr_detector.detectAndDecode(frame)
 
-            if mark_attendance(qr_code_data) and st.session_state[qr_code_data]==False:
-                st.success(f"Attendance marked for QR code: {qr_code_data}")
-                st.session_state[qr_code_data]=True
-            elif st.session_state[qr_code_data]==True:
-                st.error(f"QR Code not recognized")
-                st.session_state[qr_code_data]=False
+    if qr_code_data:
+        st.write(f"QR Code detected: {qr_code_data}")
+
+        if mark_attendance(qr_code_data):
+            st.success(f"Attendance marked for QR code: {qr_code_data}")
+        else:
+            st.error("QR Code not recognized")
 
     # Stop when the checkbox is unchecked
     if not run:

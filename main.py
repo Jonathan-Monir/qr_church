@@ -7,7 +7,7 @@ import string
 from PIL import Image
 import imageio
 import numpy as np
-import cv2  # For QR code decoding
+import cv2  # For QR code decoding and video capture
 from datetime import date
 
 # Function to mark attendance
@@ -53,29 +53,29 @@ run = st.checkbox("Start Camera")
 FRAME_WINDOW = st.image([])
 
 cap = None
-import imageio
+qr_decoder = cv2.QRCodeDetector()  # Initialize QRCodeDetector
 
 # Initialize session state to track processed QR codes
 if "processed_qr_codes" not in st.session_state:
     st.session_state.processed_qr_codes = set()
 
-# Use imageio's get_reader for webcam
 if run:
-    reader = imageio.get_reader("<video0>")  # "<video0>" corresponds to the first camera
-
-qr_decoder = cv2.QRCodeDetector()  # Initialize QRCodeDetector
+    # Start the webcam capture using OpenCV
+    cap = cv2.VideoCapture(0)  # 0 is the default camera
 
 while run:
-    try:
-        frame = reader.get_next_data()  # Get the next frame
+    if cap.isOpened():
+        ret, frame = cap.read()  # Capture frame-by-frame
+        if not ret:
+            st.error("Failed to capture video frame")
+            break
 
         # Convert the frame to RGB for display in Streamlit
-        frame_rgb = frame[..., :3]  # imageio returns a frame in RGBA, keep only RGB
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         FRAME_WINDOW.image(frame_rgb)
 
         # Decode the QR code in the frame using OpenCV
-        gray_frame = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2GRAY)  # Convert to grayscale for better QR detection
-        qr_code_data, points, _ = qr_decoder.detectAndDecode(gray_frame)
+        qr_code_data, points, _ = qr_decoder.detectAndDecode(frame)
 
         if qr_code_data:
             # Check if the QR code has already been processed
@@ -84,14 +84,14 @@ while run:
                     st.success(f"Attendance marked for QR code: {qr_code_data}")
                     st.session_state.processed_qr_codes.add(qr_code_data)
                 else:
-                    pass
+                    st.warning(f"QR code not recognized: {qr_code_data}")
             else:
-                pass
+                st.info(f"QR code {qr_code_data} has already been processed")
 
-    except RuntimeError:
-        st.error("Failed to grab frame")
-        break
+    else:
+        st.error("Webcam not found or cannot be opened")
 
     # Stop when the checkbox is unchecked
     if not run:
+        cap.release()
         break

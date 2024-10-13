@@ -7,8 +7,9 @@ import string
 from PIL import Image
 import imageio
 import numpy as np
-from pyzbar.pyzbar import decode
+import cv2  # For QR code decoding
 from datetime import date
+
 # Function to mark attendance
 def mark_attendance(qr_code):
     conn = sqlite3.connect('students.db')
@@ -40,7 +41,6 @@ def mark_attendance(qr_code):
         conn.close()
         return False
 
-
 # Streamlit app interface
 st.title("Student Attendance QR Code Generator and Scanner")
 
@@ -54,7 +54,6 @@ FRAME_WINDOW = st.image([])
 
 cap = None
 import imageio
-from pyzbar.pyzbar import decode  # Assuming you're using pyzbar for QR code decoding
 
 # Initialize session state to track processed QR codes
 if "processed_qr_codes" not in st.session_state:
@@ -64,6 +63,8 @@ if "processed_qr_codes" not in st.session_state:
 if run:
     reader = imageio.get_reader("<video0>")  # "<video0>" corresponds to the first camera
 
+qr_decoder = cv2.QRCodeDetector()  # Initialize QRCodeDetector
+
 while run:
     try:
         frame = reader.get_next_data()  # Get the next frame
@@ -72,21 +73,20 @@ while run:
         frame_rgb = frame[..., :3]  # imageio returns a frame in RGBA, keep only RGB
         FRAME_WINDOW.image(frame_rgb)
 
-        # Decode the QR code in the frame
-        decoded_objects = decode(frame_rgb)
-        if decoded_objects:
-            for obj in decoded_objects:
-                qr_code_data = obj.data.decode('utf-8')
+        # Decode the QR code in the frame using OpenCV
+        gray_frame = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2GRAY)  # Convert to grayscale for better QR detection
+        qr_code_data, points, _ = qr_decoder.detectAndDecode(gray_frame)
 
-                # Check if the QR code has already been processed
-                if qr_code_data not in st.session_state.processed_qr_codes:
-                    if mark_attendance(qr_code_data):
-                        st.success(f"Attendance marked for QR code: {qr_code_data}")
-                        st.session_state.processed_qr_codes.add(qr_code_data)
-                    else:
-                        pass
+        if qr_code_data:
+            # Check if the QR code has already been processed
+            if qr_code_data not in st.session_state.processed_qr_codes:
+                if mark_attendance(qr_code_data):
+                    st.success(f"Attendance marked for QR code: {qr_code_data}")
+                    st.session_state.processed_qr_codes.add(qr_code_data)
                 else:
                     pass
+            else:
+                pass
 
     except RuntimeError:
         st.error("Failed to grab frame")

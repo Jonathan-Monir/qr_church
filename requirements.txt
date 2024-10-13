@@ -1,4 +1,3 @@
-opencv-python==4.10.0.84
-pyzbar
+opencv-python-headless
 Pillow
 qrcode

@@ -5,7 +5,7 @@ import io
 import random
 import string
 from PIL import Image
-import cv2
+import imageio
 import numpy as np
 from pyzbar.pyzbar import decode
 from datetime import date
@@ -43,12 +43,8 @@ def mark_attendance(qr_code):
         return False
 
 
-
-
-
 # Streamlit app interface
 st.title("Student Attendance QR Code Generator and Scanner")
-
 
 # QR Code scanning page
 st.write("Scan a QR Code to mark attendance")
@@ -59,39 +55,45 @@ run = st.checkbox("Start Camera")
 FRAME_WINDOW = st.image([])
 
 cap = None
+import imageio
+from pyzbar.pyzbar import decode  # Assuming you're using pyzbar for QR code decoding
+
+# Initialize session state to track processed QR codes
+if "processed_qr_codes" not in st.session_state:
+    st.session_state.processed_qr_codes = set()
+
+# Use imageio's get_reader for webcam
 if run:
-    cap = cv2.VideoCapture(0)
+    reader = imageio.get_reader("<video0>")  # "<video0>" corresponds to the first camera
 
 while run:
-    ret, frame = cap.read()
+    try:
+        frame = reader.get_next_data()  # Get the next frame
 
-    if not ret:
+        # Convert the frame to RGB for display in Streamlit
+        frame_rgb = frame[..., :3]  # imageio returns a frame in RGBA, keep only RGB
+        FRAME_WINDOW.image(frame_rgb)
+
+        # Decode the QR code in the frame
+        decoded_objects = decode(frame_rgb)
+        if decoded_objects:
+            for obj in decoded_objects:
+                qr_code_data = obj.data.decode('utf-8')
+
+                # Check if the QR code has already been processed
+                if qr_code_data not in st.session_state.processed_qr_codes:
+                    if mark_attendance(qr_code_data):
+                        st.success(f"Attendance marked for QR code: {qr_code_data}")
+                        st.session_state.processed_qr_codes.add(qr_code_data)
+                    else:
+                        pass
+                else:
+                    pass
+
+    except RuntimeError:
         st.error("Failed to grab frame")
         break
-
-    # Convert the frame to RGB for display in Streamlit
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    FRAME_WINDOW.image(frame)
-
-    st.session_state[qr_code_data]=False
-    # Decode the QR code in the frame
-    decoded_objects = decode(frame)
-    if decoded_objects:
-        for obj in decoded_objects:
-            qr_code_data = obj.data.decode('utf-8')
-            st.write(f"QR Code detected: {qr_code_data}")
-
-            if mark_attendance(qr_code_data) and st.session_state[qr_code_data]==False:
-                st.success(f"Attendance marked for QR code: {qr_code_data}")
-                st.session_state[qr_code_data]=True
-            elif st.session_state[qr_code_data]==True:
-                st.error(f"QR Code not recognized")
-                st.session_state[qr_code_data]=False
 
     # Stop when the checkbox is unchecked
     if not run:
         break
-
-if cap:
-    cap.release()
-    cv2.destroyAllWindows()

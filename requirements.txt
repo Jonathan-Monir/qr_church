@@ -3,3 +3,4 @@ pyzbar
 Pillow
 qrcode
 imageio
+zbar

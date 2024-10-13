@@ -14,7 +14,6 @@ from datetime import date
 def mark_attendance(qr_code):
     conn = sqlite3.connect('students.db')
     c = conn.cursor()
-
     # Check if the student exists
     c.execute("SELECT id FROM students WHERE qr_code = ?", (qr_code,))
     result = c.fetchone()
